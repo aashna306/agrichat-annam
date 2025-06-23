@@ -110,5 +110,3 @@ Present your answer in a clean format using bullet points or short paragraphs wi
         )
 
         return response.choices[0].message.content.strip()
-
-
