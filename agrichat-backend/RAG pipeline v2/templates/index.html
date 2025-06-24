@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgriChat - Your Farming Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="sidebar-collapsed">
+  <aside class="sidebar collapsed" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">
+        <i class="fas fa-history"></i>
+        Recent Sessions
+      </div>
+      <div class="sidebar-controls">
+        <a href="/" class="btn btn-new">
+          <i class="fas fa-plus"></i>
+          New Chat
+        </a>
+        <button class="btn btn-toggle" id="viewToggle" onclick="toggleView()">
+          <i class="fas fa-eye"></i>
+          <span id="viewToggleText">Active</span>
+        </button>
+      </div>
+    </div>
+    
+    <div class="sessions-container" id="sessionsContainer">
+      <!-- Active Sessions -->
+      <div id="activeSessions">
+        {% for s in recent_sessions %}
+          {% if s.status == 'active' %}
+          <div class="session-entry {% if session and session.session_id == s.session_id %}active{% endif %}">
+            <a href="/resume/{{ s.session_id }}">
+              <div class="session-date">
+                <i class="fas fa-calendar"></i>
+                {{ s.timestamp.strftime('%d %b %Y %H:%M') }}
+              </div>
+              {% if s.messages %}
+              <div class="session-preview">{{ s.messages[0].question[:50] }}...</div>
+              {% endif %}
+              <div class="badges">
+                <span class="badge">{{ s.crop }}</span>
+                <span class="badge">{{ s.state }}</span>
+                {% if s.has_unread %}
+                <span class="badge" style="background: #ff6b35;">New</span>
+                {% endif %}
+              </div>
+            </a>
+            <div class="session-actions">
+              <div class="session-status">
+                <i class="fas fa-circle" style="color: #28a745; font-size: 8px;"></i>
+                Active
+              </div>
+              <form method="post" action="/toggle-status/{{s.session_id}}/{{s.status}}/" style="display: inline;" onsubmit="return confirmToggleStatus(event, '{{s.status}}')">
+                <button type="submit" class="btn-archive">
+                  <i class="fas fa-archive"></i>
+                  Archive
+                </button>
+              </form>
+            </div>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      
+      <!-- Archived Sessions (hidden by default) -->
+      <div id="archivedSessions" style="display: none;">
+        {% for s in recent_sessions %}
+          {% if s.status == 'archived' %}
+          <div class="session-entry archived">
+            <a href="/resume/{{ s.session_id }}">
+              <div class="session-date">
+                <i class="fas fa-calendar"></i>
+                {{ s.timestamp.strftime('%d %b %Y %H:%M') }}
+              </div>
+              {% if s.messages %}
+              <div class="session-preview">{{ s.messages[0].question[:50] }}...</div>
+              {% endif %}
+              <div class="badges">
+                <span class="badge archived">{{ s.crop }}</span>
+                <span class="badge archived">{{ s.state }}</span>
+                <span class="badge archived">Archived</span>
+              </div>
+            </a>
+            <div class="session-actions">
+              <div class="session-status">
+                <i class="fas fa-circle" style="color: #999; font-size: 8px;"></i>
+                Archived
+              </div>
+              <form method="post" action="/toggle-status/{{s.session_id}}/{{s.status}}/" style="display: inline;" onsubmit="return confirmToggleStatus(event, '{{s.status}}')">
+                <button type="submit" class="btn-unarchive">
+                  <i class="fas fa-undo"></i>
+                  Restore
+                </button>
+              </form>
+            </div>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      
+      <div class="no-sessions" id="noSessions" style="display: none;">
+        <div class="icon">
+          <i class="fas fa-inbox"></i>
+        </div>
+        <p>No sessions found</p>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-container">
+    <header class="main-header">
+      <div class="header-left">
+        <button class="sidebar-toggle" onclick="toggleSidebar()">
+          <i class="fas fa-bars" id="sidebarIcon"></i>
+        </button>
+        <h1 class="main-title">
+          <i class="fas fa-seedling"></i>
+          AgriChat
+        </h1>
+      </div>
+      {% if session %}
+      <a class="export-button" href="/export/csv/{{ session.session_id }}">
+        <i class="fas fa-download"></i>
+        Export CSV
+      </a>
+      {% endif %}
+    </header>
+
+    <div class="chat-area">
+      {% if session and session.status == 'archived' %}
+      <div class="archived-notice">
+        <div class="icon">
+          <i class="fas fa-archive"></i>
+        </div>
+        <h3>This session is archived</h3>
+        <p>You need to restore this session before you can continue the conversation.</p>
+        <form method="post" action="/toggle-status/{{session.session_id}}/archived/" style="display: inline;">
+          <button type="submit">
+            <i class="fas fa-undo"></i>
+            Restore Session
+          </button>
+        </form>
+      </div>
+      {% elif messages %}
+      <div class="chat-window">
+        {% for m in messages %}
+        <div class="message user">
+          <strong><i class="fas fa-user"></i> You:</strong>
+          {{ m.question }}
+        </div>
+        <div class="message bot">
+          <strong><i class="fas fa-robot"></i> AgriChat:</strong>
+          {{ m.answer | safe }}
+        </div>
+        {% endfor %}
+      </div>
+
+      <form method="post" action="/resume/{{ session.session_id }}/query" class="chat-form">
+        <textarea name="question" placeholder="Ask your agricultural question here..." required rows="3">{{ question if question else ''}}</textarea>
+        <button type="submit">
+          <i class="fas fa-paper-plane"></i>
+          Send
+        </button>
+      </form>
+      {% else %}
+      <div class="start-screen">
+        <div class="icon">
+          <i class="fas fa-seedling"></i>
+        </div>
+        <h2>Welcome to AgriChat</h2>
+        <p>Your intelligent farming assistant is here to help you with agricultural queries, crop management, and farming best practices.</p>
+        
+        <form method="post" action="/query" class="chat-form" style="max-width: 600px; margin: 0 auto;">
+          <textarea name="question" placeholder="Ask me anything about farming, crops, soil, weather, or agricultural practices..." required rows="3">{{ question if question else ''}}</textarea>
+          <button type="submit">
+            <i class="fas fa-seedling"></i>
+            Start Chat
+          </button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </main>
+
+  <script>
+    let sidebarVisible = false;
+    let showingArchived = false;
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const body = document.body;
+      const icon = document.getElementById('sidebarIcon');
+      
+      sidebarVisible = !sidebarVisible;
+      
+      if (sidebarVisible) {
+        sidebar.classList.remove('collapsed');
+        body.classList.remove('sidebar-collapsed');
+        icon.className = 'fas fa-times';
+      } else {
+        sidebar.classList.add('collapsed');
+        body.classList.add('sidebar-collapsed');
+        icon.className = 'fas fa-bars';
+      }
+    }
+
+    function toggleView() {
+      const activeDiv = document.getElementById('activeSessions');
+      const archivedDiv = document.getElementById('archivedSessions');
+      const toggleBtn = document.getElementById('viewToggle');
+      const toggleText = document.getElementById('viewToggleText');
+      const noSessions = document.getElementById('noSessions');
+      
+      showingArchived = !showingArchived;
+      
+      if (showingArchived) {
+        activeDiv.style.display = 'none';
+        archivedDiv.style.display = 'block';
+        toggleBtn.classList.add('active');
+        toggleText.textContent = 'Archived';
+        
+        // Check if there are archived sessions
+        if (archivedDiv.children.length === 0) {
+          noSessions.style.display = 'block';
+        } else {
+          noSessions.style.display = 'none';
+        }
+      } else {
+        activeDiv.style.display = 'block';
+        archivedDiv.style.display = 'none';
+        toggleBtn.classList.remove('active');
+        toggleText.textContent = 'Active';
+        noSessions.style.display = 'none';
+      }
+    }
+
+    function confirmToggleStatus(event, status) {
+      const message = status === "active" 
+        ? "Are you sure you want to archive this session?" 
+        : "Are you sure you want to restore this session?";
+      
+      if (!confirm(message)) {
+        event.preventDefault();
+        return false;
+      }
+      return true;
+    }
+
+    // Auto-resize textarea
+    document.addEventListener('DOMContentLoaded', function() {
+      const textareas = document.querySelectorAll('textarea');
+      textareas.forEach(textarea => {
+        textarea.addEventListener('input', function() {
+          this.style.height = 'auto';
+          this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+      });
+    });
+
+    // Close sidebar when clicking outside on mobile
+    document.addEventListener('click', function(event) {
+      if (window.innerWidth <= 768) {
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.querySelector('.sidebar-toggle');
+        
+        if (sidebarVisible && !sidebar.contains(event.target) && !sidebarToggle.contains(event.target)) {
+          toggleSidebar();
+        }
+      }
+    });
+
+    const chatWindow = document.querySelector(".chat-window");
+    if (chatWindow) chatWindow.scrollTop = chatWindow.scrollHeight;
+
+    textarea.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        this.closest("form").submit();
+      }
+    });
+
+
+  </script>
+</body>
+</html>
