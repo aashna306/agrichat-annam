@@ -9,18 +9,29 @@ from bs4 import BeautifulSoup
 from RAGpipelinev3.main import ChromaQueryHandler
 import markdown
 import csv
+from starlette.middleware.base import BaseHTTPMiddleware
 from io import StringIO
 import os
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://agrichat-annam.vercel.app"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+class CustomCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.method == "OPTIONS":
+            response = JSONResponse(content={"message": "Preflight OK"})
+        else:
+            response = await call_next(request)
+
+        origin = request.headers.get("origin")
+        if origin == "https://agrichat-annam.vercel.app":
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+
+        return response
+
+app.add_middleware(CustomCORSMiddleware)
 
 @app.options("/{rest_of_path:path}")
 async def preflight_handler():
