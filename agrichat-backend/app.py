@@ -10,6 +10,7 @@ from RAGpipelinev3.main import ChromaQueryHandler
 import markdown
 import csv
 from io import StringIO
+import os
 
 app = FastAPI()
 
@@ -21,7 +22,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = MongoClient("mongodb://localhost:27017/")
+MONGO_URI = os.getenv("MONGO_URI")
+client = MongoClient(MONGO_URI)
 db = client["agrichat"]
 sessions_collection = db["sessions"]
 

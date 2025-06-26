@@ -1,4 +1,5 @@
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "https://agrichat-annam.onrender.com/api";
+// const API_BASE = "http://localhost:8000/api";
 
 let currentSession = null;
 let showingArchived = false;

@@ -12,3 +12,4 @@ markdown
 openai
 numpy
 python-multipart
+gunicorn
