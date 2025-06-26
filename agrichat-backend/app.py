@@ -22,6 +22,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.options("/{rest_of_path:path}")
+async def preflight_handler():
+    return JSONResponse(
+        content={"message": "CORS preflight"},
+        headers={
+            "Access-Control-Allow-Origin": "https://agrichat-annam.vercel.app",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+        },
+    )
+
+
 MONGO_URI = os.getenv("MONGO_URI")
 client = MongoClient(MONGO_URI)
 db = client["agrichat"]
