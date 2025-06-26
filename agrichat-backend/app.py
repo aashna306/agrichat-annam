@@ -51,7 +51,7 @@ async def new_session(question: str = Form(...)):
     answer_only = raw_answer.split("</think>")[-1].strip() if "</think>" in raw_answer else raw_answer.strip()
     html_answer = markdown.markdown(answer_only, extensions=["extra", "nl2br"])
     crop = "unknown"
-    state = "unkonwn"
+    state = "unknown"
     session = {
         "session_id": session_id,
         "timestamp": datetime.now(),
@@ -139,3 +139,10 @@ async def export_csv(session_id: str):
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+    
+@app.delete("/api/delete-session/{session_id}")
+async def delete_session(session_id: str):
+    result = sessions_collection.delete_one({"session_id":session_id})
+    if result.deleted_count == 0:
+        return JSONResponse(status_code=404, content={"error":"Session not found"})
+    return {"message": "Session deleted successfully"}
