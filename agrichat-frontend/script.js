@@ -1,5 +1,9 @@
 const API_BASE = "https://agrichat-annam.onrender.com/api";
 // const API_BASE = "http://localhost:8000/api";
+const VISION_API_BASE = "";
+const SPEECH_API_BASE = "";
+
+let extractedImageSummary = "";
 
 const stateLanguageMap = {
   "Andhra Pradesh": "Telugu",
@@ -325,7 +329,7 @@ window.addEventListener("DOMContentLoaded", () => {
     formData.append("device_id", deviceId);
     formData.append("state", state);
     formData.append("language", lang);
-
+    formData.append("imageText", extractedImageSummary.trim()); 
     showLoader();
     const res = await fetch(`${API_BASE}/query`, {
       method: "POST",
@@ -353,7 +357,8 @@ window.addEventListener("DOMContentLoaded", () => {
     formData.append("question", question);
     formData.append("device_id", deviceId);
     formData.append("state", localStorage.getItem("agrichat_user_state") || "");
-
+    formData.append("language", lang);
+    formData.append("imageText", extractedImageSummary.trim()); 
     showLoader();
     const res = await fetch(`${API_BASE}/session/${currentSession.session_id}/query`, {
       method: "POST",
@@ -464,3 +469,166 @@ document.getElementById("resetLocationBtn").addEventListener("click", async () =
   document.getElementById("locationEdit").style.display = "none"; 
 });
 
+const attachButton = document.querySelector('.feature-button[aria-label="Attach file or image"]');
+const fileInput = document.getElementById('imageUploadInput');
+const startFormTextarea = document.querySelector('#start-form textarea');
+
+attachButton.addEventListener('click', () => {
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  document.getElementById("loadingOverlay").style.display = "block";
+
+  try {
+    const response = await fetch(`${VISION_API_BASE}/predict`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await response.json();
+    extractedImageSummary = data?.summary || ""; 
+
+
+  } catch (err) {
+    console.error(err);
+    alert("Image processing failed.");
+    extractedImageSummary = "";
+  } finally {
+    document.getElementById("loadingOverlay").style.display = "none";
+  }
+});
+
+// let mediaRecorder;
+// let audioChunks = [];
+
+// const voiceBtn = document.getElementById("voiceInputBtn");
+// const textArea = document.querySelector("#start-form textarea");
+
+// voiceBtn.addEventListener("click", async () => {
+//   if (!mediaRecorder || mediaRecorder.state === "inactive") {
+//     try {
+//       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+//       mediaRecorder = new MediaRecorder(stream);
+
+//       audioChunks = [];
+
+//       mediaRecorder.ondataavailable = e => {
+//         audioChunks.push(e.data);
+//       };
+//       console.log(audioChunks)
+//       mediaRecorder.onstop = async () => {
+//         const audioBlob = new Blob(audioChunks, { type: "audio/webm" }); // or 'audio/wav'
+//         const formData = new FormData();
+//         formData.append("audio", audioBlob);
+
+//         try {
+//           const response = await fetch(`${API_BASE}/speech-to-text`, {
+//             method: "POST",
+//             body: formData
+//           });
+//           const result = await response.json();
+//           const transcript = result.transcript || "";
+
+//           textArea.value = transcript;
+//         } catch (err) {
+//           alert("Voice input failed. Please try again.");
+//           console.error(err);
+//         }
+//       };
+
+//       mediaRecorder.start();
+//       voiceBtn.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Listening...`;
+
+//       setTimeout(() => {
+//         mediaRecorder.stop();
+//         voiceBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"><path d="M5 3a3 3 0 0 1 6 0v5a3 3 0 0 1-6 0V3z"/><path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5z"/></svg>`;
+//       }, 5000); 
+//     } catch (error) {
+//       alert("Microphone access denied.");
+//       console.error(error);
+//     }
+//   }
+// });
+
+
+let mediaRecorder;
+let audioChunks = [];
+let isRecording = false;
+let audioStream;
+
+const voiceBtn = document.getElementById("voiceInputBtn");
+const textArea = document.getElementById("userQueryInput"); 
+
+voiceBtn.addEventListener("click", async () => {
+  if (!isRecording) {
+    try {
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(audioStream);
+      audioChunks = [];
+
+      mediaRecorder.ondataavailable = e => {
+        audioChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+        console.log("Recording complete. Size:", audioBlob.size);
+
+        audioStream.getTracks().forEach(track => track.stop());
+
+        const formData = new FormData();
+        formData.append("audio", audioBlob);
+        console.log(formData)
+        try {
+          const response = await fetch(`${SPEECH_API_BASE}/speech-to-text`, {
+            method: "POST",
+            body: formData
+          });
+
+          const result = await response.json();
+          const transcript = result.transcript || "";
+
+          if (transcript) {
+            textArea.value = transcript;
+          } else {
+            alert("Could not extract speech. Try again.");
+          }
+        } catch (err) {
+          console.error("Error sending audio:", err);
+          alert("Failed to convert speech to text.");
+        }
+      };
+
+      mediaRecorder.start();
+      isRecording = true;
+      updateVoiceBtnUI();
+      console.log("Recording started.");
+    } catch (err) {
+      console.error("Microphone access denied:", err);
+      alert("Microphone access denied.");
+    }
+  } else {
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+      mediaRecorder.stop();
+      isRecording = false;
+      updateVoiceBtnUI();
+    }
+  }
+});
+
+function updateVoiceBtnUI() {
+  if (isRecording) {
+    voiceBtn.innerHTML = `<i class="fas fa-stop-circle" style="color:red;"></i>`;
+    voiceBtn.style.backgroundColor = "#ffe6e6";
+  } else {
+    voiceBtn.innerHTML = `<i class="fas fa-microphone"></i>`;
+    voiceBtn.style.backgroundColor = "";
+  }
+}
